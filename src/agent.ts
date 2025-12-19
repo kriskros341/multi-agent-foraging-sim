@@ -84,8 +84,4 @@ export class Agent {
       }
       return tiles;
     }
-
-    pointInMap(point: Vector2D): boolean {
-      return point[0] >= 0 && point[1] >= 0 && point[0] < this.environment.size && point[1] < this.environment.size;
-    }
   }

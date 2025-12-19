@@ -69,6 +69,7 @@ export class Environment {
   size: number;
   tiles: Tile[][];
   controls = DontBotherMeControls;
+  base_position: Vector2D;
   
   constructor(size: number = Config.ENV_SIZE) {
     this.size = size;
@@ -80,6 +81,7 @@ export class Environment {
         this.tiles[i][j] = type;
       }
     }
+    this.base_position = [Math.floor(this.size / 2), Math.floor(this.size / 2)] as Vector2D;
   }
   
   snapshotTypeCounts(): { [key in TileType]: number } {
@@ -198,5 +200,9 @@ export class Environment {
   collectedMessage = true
   checkStopCondition(): void {
     
+  }
+
+  pointInMap(point: Vector2D): boolean {
+    return point[0] >= 0 && point[1] >= 0 && point[0] < this.size && point[1] < this.size;
   }
 }
