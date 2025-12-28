@@ -1,0 +1,1 @@
+Co jest lepsze, A* czy prosto po gradiencie

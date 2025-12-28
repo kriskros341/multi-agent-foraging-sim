@@ -4,12 +4,12 @@ import { BasePolicy } from "./BasePolicy.ts";
 import { CollectorPolicy } from "./CollectorPolicy.ts";
 import { Message, MESSAGE } from "@/message/index.ts";
 import { Vector2D } from "@/constants.ts";
-import { MessagesRegister, Random } from "@/util/index.ts";
+import { ConfigType, MessagesRegister } from "@/util/index.ts";
 
 export class IdlePolicy extends BasePolicy {
   messageMemory = new MessagesRegister();
-  constructor() {
-    super();
+  constructor(config: ConfigType) {
+    super(config);
   }
   
   processMessage(agent: Agent, fullmessage: Message): void {
@@ -19,14 +19,14 @@ export class IdlePolicy extends BasePolicy {
     }
     
     if (message === MESSAGE.GOING_TO_COLLECT_ACK) {
-      agent.setPolicy(new CollectorPolicy(payload.resource_position));
+      agent.setPolicy(new CollectorPolicy(agent.environment.config, payload.resource_position));
     }
   }
 
   afterMessagesProcessed(agent: Agent): void {
     if (this.messageMemory.has(MESSAGE.RESOURCE_SCOUTED)) {
       const messages = this.messageMemory.get(MESSAGE.RESOURCE_SCOUTED);
-      const payload = Random.choice(messages)!
+      const payload = agent.environment.random.choice(messages)!
       agent.sendMessage(
         payload.agentId, 
         [
@@ -51,6 +51,6 @@ export class IdlePolicy extends BasePolicy {
       { value: [1, 0] as Vector2D },  // RIGHT
     ];
 
-    return Random.choice(actions)!.value;
+    return agent.environment.random.choice(actions)!.value;
   }
 }

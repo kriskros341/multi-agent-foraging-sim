@@ -2,13 +2,14 @@
 import { Agent } from "./agent.ts";
 import { aStar } from "./algorithms/aStar.ts";
 import { Vector2D } from "./constants.ts";
-import { Config, Logger, Random } from "./util/index.ts";
+import { ConfigType, Logger, RandomGenerator } from "./util/index.ts";
 
 export const TILE_TYPES = {
   EMPTY: "EMPTY",
   RESOURCE: "RESOURCE",
   SCOUTED_RESOURCE: "SCOUTED_RESOURCE",
   BASE: "BASE",
+  UNKNOWN: "UNKNOWN",
 } as const;
 
 export type TileType = keyof typeof TILE_TYPES;
@@ -22,20 +23,7 @@ export const TileRepresentations: { [key in TileType]: string } = {
   RESOURCE: "R",
   SCOUTED_RESOURCE: "M",
   BASE: "B",
-}
-
-const spawn_entity = (x: number, y: number, size: number): Tile => {
-  // chance based spawning logic
-  if (x === Math.floor(size / 2) && y === Math.floor(size / 2)) {
-    return { type: TILE_TYPES.BASE };
-  }
-  
-  const chance = Random.next();
-  if (chance < 0.1) {
-    return { type: TILE_TYPES.RESOURCE };
-  }
-  
-  return { type: TILE_TYPES.EMPTY };
+  UNKNOWN: "?",
 }
 
 interface ProcessControls {
@@ -59,24 +47,45 @@ export const KeyboardControls: ProcessControls = {
   }
 }
 
+const spawn_entity = (rng: RandomGenerator, x: number, y: number, size: number): Tile => {
+  // chance based spawning logic
+  if (x === Math.floor(size / 2) && y === Math.floor(size / 2)) {
+    return { type: TILE_TYPES.BASE };
+  }
+
+  const chance = rng.next();
+  if (chance < 0.1) {
+    return { type: TILE_TYPES.RESOURCE };
+  }
+
+  return { type: TILE_TYPES.EMPTY };
+}
+
 export class Environment {
+  agents: { [id: string]: Agent } = {};
   typeCounter: { [key in TileType]: number } = {
     EMPTY: 0,
     RESOURCE: 0,
     SCOUTED_RESOURCE: 0,
     BASE: 0,
+    UNKNOWN: 0,
   };
   size: number;
   tiles: Tile[][];
-  controls = DontBotherMeControls;
+  controls: ProcessControls | null = null;
   base_position: Vector2D;
+  config: ConfigType;
+  random: RandomGenerator;
   
-  constructor(size: number = Config.ENV_SIZE) {
-    this.size = size;
-    this.tiles = Array.from({ length: size }, () => Array.from({ length: size }, () => ({ type: TILE_TYPES.EMPTY })));
+  constructor(config: ConfigType) {
+    this.random = new RandomGenerator(config.SEED);
+
+    this.config = config;
+    this.size = config.ENV_SIZE;
+    this.tiles = Array.from({ length: this.size }, () => Array.from({ length: this.size }, () => ({ type: TILE_TYPES.EMPTY })));
     for (let i = 0; i < this.size; i++) {
       for (let j = 0; j < this.size; j++) {
-        const type = spawn_entity(i, j, this.size);
+        const type = spawn_entity(this.random, i, j, this.size);
         this.typeCounter[type.type]++;
         this.tiles[i][j] = type;
       }
@@ -92,7 +101,7 @@ export class Environment {
     this.controls = controls;
   }
   
-  printEnvironmentEmplaceAgents(): void {
+  printEnvironmentEmplaceAgents(): string {
     const tileReprs: string[][] = [];
     // Print the environment with agents
     for (let y = 0; y < this.size; y++) {
@@ -100,13 +109,13 @@ export class Environment {
       for (let x = 0; x < this.size; x++) {
         let tileRepr = ""
         
-        tileRepr = TileRepresentations[this.tiles[y][x].type]; // Placeholder for actual agent logic
-        Object.values(Agent.agents)
-        .forEach(agent => {
-          if (agent.position[0] === x && agent.position[1] === y) {
-            tileRepr = agent.policy.symbol; // Replace last tile with agent symbol
-          }
-        });
+        tileRepr = TileRepresentations[this.tiles[y][x].type];
+        Object.values(this.agents)
+          .forEach(agent => {
+            if (agent.position[0] === x && agent.position[1] === y) {
+              tileRepr = agent.policy.symbol;
+            }
+          });
 
         
         reprRow.push(tileRepr);
@@ -114,7 +123,7 @@ export class Environment {
       tileReprs.push(reprRow);
     }
     
-    for (const agent of Object.values(Agent.agents)) {
+    for (const agent of Object.values(this.agents)) {
       agent.getVision().forEach(([type, position]) => {
         const absolutePos: Vector2D = [agent.position[0] + position[0], agent.position[1] + position[1]];
         if (tileReprs[absolutePos[1]][absolutePos[0]] === TileRepresentations[TILE_TYPES.EMPTY] && agent.policy.symbol === "S") {
@@ -123,19 +132,23 @@ export class Environment {
       });
     }
     
+    let final = "";
     // Print the environment with agents
     for (let y = 0; y < this.size; y++) {
       let rowStr = "";
       for (let x = 0; x < this.size; x++) {
         rowStr += tileReprs[y][x] + " "; // Placeholder for actual agent logic
       }
-      console.log(rowStr.trim());
+
+      Logger.log(rowStr.trim());
+      final += rowStr.trim() + "\n";
     }
+    return final;
   }
   
   processAgents() {
     // Process each agent's actions
-    Object.values(Agent.agents).forEach(agent => {
+    Object.values(this.agents).forEach(agent => {
       const action = agent.policy.chooseAction(agent);
       agent.processMessages();
       agent.move(action);
@@ -154,6 +167,7 @@ export class Environment {
       RESOURCE: 0,
       SCOUTED_RESOURCE: 0,
       BASE: 0,
+      UNKNOWN: 0,
     };
     for (let i = 0; i < this.size; i++) {
       for (let j = 0; j < this.size; j++) {
@@ -170,31 +184,28 @@ export class Environment {
     if (x < 0 || x >= this.size || y < 0 || y >= this.size) {
       return true;
     }
-    return !!Object.values(Agent.agents).find(agent => agent.position[0] === x && agent.position[1] === y);
+    return !!Object.values(this.agents).find(agent => agent.position[0] === x && agent.position[1] === y);
   }
 
   // Goal musi być podany, aby umożliwić sprawdzanie, czy sąsiad to cel
-  getNeighbors = (node: Vector2D, goal: Vector2D): Vector2D[] => {
+  getNeighbors = (node: Vector2D, goal?: Vector2D): Vector2D[] => {
     const directions: Vector2D[] = [
       [0, -1], // UP
       [0, 1],  // DOWN
       [-1, 0], // LEFT
       [1, 0],  // RIGHT
     ];
-    const neighbors: Vector2D[] = [];
-    for (const dir of directions) {
-      const neighbor: Vector2D = [node[0] + dir[0], node[1] + dir[1]];
-      if (!this.checkTileForObstacle(neighbor) || (neighbor[0] === goal[0] && neighbor[1] === goal[1])) {
-        neighbors.push(neighbor);
-      }
-    }
+    const neighbors: Vector2D[] = directions.map(dir => [node[0] + dir[0], node[1] + dir[1]] as Vector2D)
+      .filter(pos => {
+        // Allow if not an obstacle or is the goal
+        return !this.checkTileForObstacle(pos) || (pos[0] === goal?.[0] && pos[1] === goal?.[1]);
+      });
     return neighbors;
   }
 
   createPath = (from: Vector2D, to: Vector2D): Vector2D[] | null => {
-    const first = aStar(from, to, this.getNeighbors);
-    const second = aStar(to, [Math.floor(this.size / 2), Math.floor(this.size / 2)], this.getNeighbors);
-    return [...first ?? [], ...second?.slice(1) ?? []];
+    const first = aStar(from, to);
+    return first;
   }
 
   collectedMessage = true
@@ -204,5 +215,11 @@ export class Environment {
 
   pointInMap(point: Vector2D): boolean {
     return point[0] >= 0 && point[1] >= 0 && point[0] < this.size && point[1] < this.size;
+  }
+
+  randomTile() {
+    const x = Math.floor(this.random.next() * this.size);
+    const y = Math.floor(this.random.next() * this.size);
+    return [x, y] as Vector2D;
   }
 }

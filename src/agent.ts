@@ -4,44 +4,47 @@ import { Vector2D } from "./constants.ts";
 import { Policy } from "./policies/interfaces.ts";
 import { IdlePolicy } from "./policies/IdlePolicy.ts";
 import { Message } from "./message/index.ts";
-import { Environment, TileType } from "./environment.ts";
-import { Config, Logger, Random } from "./util/index.ts";
+import { Environment, TILE_TYPES, TileType } from "./environment.ts";
+import { Logger } from "./util/index.ts";
 
 export class Agent {
-  static agents: { [id: string]: Agent } = {};
   id: string;
   position: Vector2D;
   policy: Policy;
   mailbox: Queue<Message>;
   environment: Environment;
+  knowledge: (TileType)[][];
   
   constructor(environment: Environment, position?: Vector2D) {
     this.id = uuidv4();
-    this.position = position ?? Random.randomTile(environment.size);
-    this.policy = new IdlePolicy();
+    this.position = position ?? environment.randomTile();
+    this.policy = new IdlePolicy(environment.config);
     this.mailbox = new Queue();
     this.environment = environment;
-    Agent.agents[this.id] = this;
+    environment.agents[this.id] = this;
+    this.knowledge = Array.from({ length: environment.size }, () =>
+      Array.from({ length: environment.size }, () => TILE_TYPES.UNKNOWN)
+    ) as (TileType)[][];
   }
-  
+
   setPolicy(policy: Policy): Agent {
     this.policy = policy;
     return this;
   }
   
   broadcast(message: Message): void {
-    for (const agent_id in Agent.agents) {
+    for (const agent_id in this.environment.agents) {
       if (agent_id !== this.id) {
-        Agent.agents[agent_id].mailbox.enqueue(message);
+        this.environment.agents[agent_id].mailbox.enqueue(message);
       }
     }
   }
   
   sendMessage(recipient_id: string, message: Message): void {
-    if (recipient_id in Agent.agents) {
-      Agent.agents[recipient_id].mailbox.enqueue(message);
+    if (recipient_id in this.environment.agents) {
+      this.environment.agents[recipient_id].mailbox.enqueue(message);
     }
-    Logger.log(`Agent ${this.id} (${this.policy.symbol}) sent message to ${recipient_id} ${Agent.agents[recipient_id].policy.symbol}:`, message);
+    Logger.log(`Agent ${this.id} (${this.policy.symbol}) sent message to ${recipient_id} ${this.environment.agents[recipient_id].policy.symbol}:`, message);
   }
   
   processMessages(): void {

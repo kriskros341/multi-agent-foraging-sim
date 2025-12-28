@@ -1,17 +1,15 @@
 import { Vector2D } from "@/constants.ts";
 import { MESSAGE, Message } from "@/message/index.ts";
-import { ExtractPayload, Random } from "@/util/index.ts";
+import { ExtractPayload, RandomGenerator } from "@/util/index.ts";
 
 type CollectMessage = ExtractPayload<Message, typeof MESSAGE.GOING_TO_COLLECT>
 
-export const randomChoice = (payloads: CollectMessage[], _?: unknown) => Random.choice(payloads) ?? null;
-
 export interface CollectorChoiceMethod {
-  run(payloads: CollectMessage[], algorithm?: (start: Vector2D, end: Vector2D) => Vector2D[] | null): CollectMessage | null;
+  run(rng: RandomGenerator, payloads: CollectMessage[], algorithm?: (start: Vector2D, end: Vector2D) => Vector2D[] | null): CollectMessage | null;
 }
 
 export const bestPathCollectorChoice: CollectorChoiceMethod = {
-  run(payloads: CollectMessage[], algorithm: (start: Vector2D, end: Vector2D) => Vector2D[] | null) {
+  run(rng: RandomGenerator, payloads: CollectMessage[], algorithm: (start: Vector2D, end: Vector2D) => Vector2D[] | null) {
     let best = null;
     let best_value = null;
     for (const payload of payloads) {
@@ -24,14 +22,18 @@ export const bestPathCollectorChoice: CollectorChoiceMethod = {
         best = payload;
         best_value = path_length;
       }
-      console.log("TEST", best_value)
     }
     return best;
   }
 };
 
 export const randomCollectorChoice: CollectorChoiceMethod = {
-  run(payloads: CollectMessage[]): CollectMessage | null {
-    return Random.choice(payloads) ?? null; 
+  run(rng: RandomGenerator, payloads: CollectMessage[]): CollectMessage | null {
+    return rng.choice(payloads) ?? null; 
   }
 };
+
+export const collectorChoice = {
+  bestPathCollectorChoice,
+  randomCollectorChoice,
+} as const

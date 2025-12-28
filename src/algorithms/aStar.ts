@@ -4,7 +4,7 @@ export function heuristic(a: Vector2D, b: Vector2D): number {
   return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
 }
 
-export function aStar(start: Vector2D, goal: Vector2D, neighborsFn: (node: Vector2D, goal: Vector2D) => Vector2D[]): Vector2D[] | null {
+export function aStar(start: Vector2D, goal: Vector2D): Vector2D[] | null {
   const openSet: Set<string> = new Set();
   openSet.add(start.toString());
 
@@ -40,7 +40,14 @@ export function aStar(start: Vector2D, goal: Vector2D, neighborsFn: (node: Vecto
 
     openSet.delete(current!.toString());
 
-    for (const neighbor of neighborsFn(current!, goal)) {
+    const actions: Vector2D[] = [
+      [0, -1], // UP
+      [0, 1],  // DOWN
+      [-1, 0], // LEFT
+      [1, 0],  // RIGHT
+    ];
+    for (const action of actions) {
+      const neighbor: Vector2D = [current![0] + action[0], current![1] + action[1]];
       const tentativeGScore = (gScore.get(current!.toString()) ?? Infinity) + 1;
 
       if (tentativeGScore < (gScore.get(neighbor.toString()) ?? Infinity)) {

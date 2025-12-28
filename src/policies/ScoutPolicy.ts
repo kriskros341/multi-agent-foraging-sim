@@ -4,21 +4,22 @@ import { Agent } from "../agent.ts";
 import { Direction, Vector2D } from "../constants.ts";
 import { BasePolicy } from "./BasePolicy.ts";
 import { TILE_TYPES, TileType } from "@/environment.ts";
-import { ExtractPayload, MessagesRegister, Random } from "@/util/index.ts";
-import { bestPathCollectorChoice, CollectorChoiceMethod } from "./methods/collectorChoice.ts";
+import { ConfigType, MessagesRegister } from "@/util/index.ts";
+import { collectorChoice, CollectorChoiceMethod } from "./methods/collectorChoice.ts";
 
 export class ScoutPolicy extends BasePolicy {
   messageMemory = new MessagesRegister();
-  collectorChoiceFunction: CollectorChoiceMethod = bestPathCollectorChoice;
+  collectorChoiceFunction: CollectorChoiceMethod | null = null;
   symbol: string;
   responses: Array<Message>;
   waiting: boolean;
-  
-  constructor() {
-    super();
+
+  constructor(config: ConfigType) {
+    super(config);
     this.symbol = "S";
     this.responses = [];
     this.waiting = false;
+    this.collectorChoiceFunction = collectorChoice[config.SCOUT_COLLECTOR_CHOICE_METHOD] ?? null;
   }
 
   setCollectorChoiceFunction(fn: CollectorChoiceMethod): this {
@@ -50,7 +51,7 @@ export class ScoutPolicy extends BasePolicy {
       }
     }
     
-    return Random.choice(actions)!.value;
+    return agent.environment.random.choice(actions)!.value;
   }
   
   onPickup(agent: Agent, cell: TileType): TileType {
@@ -80,7 +81,10 @@ export class ScoutPolicy extends BasePolicy {
   afterMessagesProcessed(agent: Agent): void {
     if (this.messageMemory.has(MESSAGE.GOING_TO_COLLECT)) {
       const payloads = this.messageMemory.get(MESSAGE.GOING_TO_COLLECT)
-      const payload = this.collectorChoiceFunction.run(payloads, agent.environment.createPath)!;
+      if (!this.collectorChoiceFunction) {
+        throw new Error("Collector choice function not set for ScoutPolicy");
+      }
+      const payload = this.collectorChoiceFunction.run(agent.environment.random, payloads, agent.environment.createPath)!;
       agent.sendMessage(payload.agentId, [MESSAGE.GOING_TO_COLLECT_ACK, payload]);
 
       this.waiting = false;

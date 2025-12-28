@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "tsx --test 'tests/**/*.test.ts'",
-    "start": "tsx src/main.ts --"
+    "start": "tsx src/main.ts --",
+    "start:experiments": "tsx src/experiments.ts --",
+    "start:experiment": "tsx src/experiment.ts --"
   },
   "type": "module",
   "keywords": [],
