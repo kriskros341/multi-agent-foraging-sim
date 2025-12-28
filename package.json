@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "tsx --test 'tests/**/*.test.ts'",
+    "analyze:pathfinding": "gemini --prompt 'run pathfinding experiments in experiments/pathfinding/*' --yolo",
     "start": "tsx src/main.ts --",
     "start:experiments": "tsx src/experiments.ts --",
     "start:experiment": "tsx src/experiment.ts --"

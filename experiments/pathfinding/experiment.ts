@@ -2,7 +2,19 @@ import { Agent } from "@/agent.ts";
 import { ScoutPolicy } from "@/policies/ScoutPolicy.ts";
 import { IdlePolicy } from "@/policies/IdlePolicy.ts";
 import { Environment, KeyboardControls } from "@/environment.ts";
-import { ConfigType, createConfig, Logger } from "./util/index.ts";
+import { ConfigType, createConfig, Logger } from "@/util/index.ts";
+
+const flattenObject = (obj: any, parentKey = '', result: any = {}) => {
+  for (let key in obj) {
+    const newKey = parentKey ? `${parentKey}_${key}` : key;
+    if (typeof obj[key] === 'object' && obj[key] !== null) {
+      flattenObject(obj[key], newKey, result);
+    } else {
+      result[newKey] = obj[key];
+    }
+  }
+  return result;
+};
 
 const run = async (config1: ConfigType, config2: ConfigType) => {
   const env1 = new Environment(config1);
@@ -47,16 +59,8 @@ const run = async (config1: ConfigType, config2: ConfigType) => {
     const env1map = env1.printEnvironmentEmplaceAgents();
     const env2map = env2.printEnvironmentEmplaceAgents();
 
-    // place next to each other
     const combinedMap = env1map.split("\n").map((line, index) => line + "    " + env2map.split("\n")[index]).join("\n");
     console.log(combinedMap);
-    
-    // if (env.typeCounter.RESOURCE === 0 && env.collectedMessage) {
-    //   Logger.log("All resources have been collected.");
-    //   env.collectedMessage = false;
-    //   env.setControls(KeyboardControls);
-    //   // process.exit(0);
-    // }
 
     // check if agents diverged
     const env1Positions = Object.values(env1.agents).map(agent => agent.position);
@@ -89,19 +93,6 @@ const run = async (config1: ConfigType, config2: ConfigType) => {
 
   return { iter, seed: config1.SEED,  startingTypeCounts, endingTypeCounts, final_environment_snapshot: [env1.printEnvironmentEmplaceAgents(), env2.printEnvironmentEmplaceAgents()] };
 }
-
-const flattenObject = (obj: any, parentKey = '', result: any = {}) => {
-  for (let key in obj) {
-    const newKey = parentKey ? `${parentKey}_${key}` : key;
-    if (typeof obj[key] === 'object' && obj[key] !== null) {
-      flattenObject(obj[key], newKey, result);
-    } else {
-      result[newKey] = obj[key];
-    }
-  }
-  return result;
-};
-
 
 (async () => {
   const config1 = createConfig({
